@@ -5,9 +5,11 @@ Pipeline
 1. Turn each course dict into a LangChain ``Document`` (rich text + metadata).
 2. Embed the documents with Gemini embeddings and index them in a FAISS
    vector store for semantic search.
-3. On a question, retrieve the most relevant courses and pass them to Gemini,
-   which returns a structured ``RecommendationResponse`` (Pydantic).
-4. Enrich the response with source metadata and total learning hours.
+3. Route the incoming message: a greeting / catalog question is answered
+   conversationally, while a request for guidance runs the RAG recommendation.
+4. For a recommendation, retrieve the most relevant courses and ask Gemini for a
+   structured ``RecommendationResponse`` (Pydantic), then enrich it with source
+   metadata and total learning hours.
 
 Covers the core assignment plus bonuses:
     #1 custom tool -> ``calculate_total_learning_hours``
@@ -20,6 +22,7 @@ from __future__ import annotations
 
 import os
 import re
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 from dotenv import load_dotenv
@@ -36,6 +39,7 @@ from courses import courses
 from models import (
     FinalRecommendation,
     RecommendationResponse,
+    RouterDecision,
     SourceMetadata,
 )
 
@@ -80,6 +84,18 @@ def build_documents() -> List[Document]:
         }
         documents.append(Document(page_content=content, metadata=metadata))
     return documents
+
+
+def build_catalog_summary() -> str:
+    """A compact overview of the whole catalog for the router/general replies."""
+    lines = []
+    for course in courses:
+        lines.append(
+            f"{course['course_id']}: {course['course_name']} "
+            f"({course['experience_level']}, {course['duration']}) — "
+            f"skills: {', '.join(course['skills_taught'])}"
+        )
+    return "\n".join(lines)
 
 
 # --------------------------------------------------------------------------- #
@@ -127,7 +143,7 @@ class ConversationHistory:
 
 
 # --------------------------------------------------------------------------- #
-# The assistant
+# Prompts + reply type
 # --------------------------------------------------------------------------- #
 SYSTEM_PROMPT = """You are a Course Recommendation Assistant for an SAP + AI
 learning academy. Recommend courses ONLY from the retrieved catalog context
@@ -150,7 +166,40 @@ Conversation so far:
 {history}
 """
 
+ROUTER_PROMPT = """You are the front desk of an SAP + AI course academy.
+Decide how to handle the user's latest message.
 
+- intent = "recommend": the user asks which course(s) to take, what to learn,
+  a learning path, or describes their background/goal and wants guidance.
+- intent = "general": greetings, small talk, a request to list or browse the
+  catalog, a question about a specific course, or anything that is not a
+  personalized recommendation.
+
+When intent = "general", write a helpful, friendly answer in `reply` using the
+catalog below (greet and invite them to share their background, list the
+courses, or answer their question). When intent = "recommend", leave `reply`
+empty — a separate step will build the recommendation.
+
+Course catalog:
+{catalog}
+
+Conversation so far:
+{history}
+"""
+
+
+@dataclass
+class AssistantReply:
+    """What ``chat`` returns: either a plain message or a full recommendation."""
+
+    kind: str  # "message" or "recommendation"
+    message: Optional[str] = None
+    recommendation: Optional[FinalRecommendation] = None
+
+
+# --------------------------------------------------------------------------- #
+# The assistant
+# --------------------------------------------------------------------------- #
 class CourseRecommendationAssistant:
     """RAG assistant returning structured, source-attributed recommendations."""
 
@@ -169,6 +218,11 @@ class CourseRecommendationAssistant:
         self._prompt = ChatPromptTemplate.from_messages(
             [("system", SYSTEM_PROMPT), ("human", "{question}")]
         )
+        self._router_prompt = ChatPromptTemplate.from_messages(
+            [("system", ROUTER_PROMPT), ("human", "{question}")]
+        )
+        self._router_llm = self._llm.with_structured_output(RouterDecision)
+        self._catalog_summary = build_catalog_summary()
         self.history = ConversationHistory()
 
     def _format_context(self, docs: List[Document]) -> str:
@@ -234,6 +288,34 @@ class CourseRecommendationAssistant:
 
         return final
 
+    def chat(self, question: str) -> AssistantReply:
+        """Route a message: greet/answer generally, or recommend courses.
+
+        This prevents every message (e.g. "hi" or "list all courses") from
+        being forced into a course recommendation.
+        """
+        router_chain = self._router_prompt | self._router_llm
+        decision: RouterDecision = router_chain.invoke(
+            {
+                "catalog": self._catalog_summary,
+                "history": self.history.as_prompt_text(),
+                "question": question,
+            }
+        )
+
+        if decision.intent == "recommend":
+            return AssistantReply(
+                kind="recommendation", recommendation=self.recommend(question)
+            )
+
+        # General reply: fall back to a friendly prompt if the model left it empty.
+        message = decision.reply.strip() or (
+            "Hi! I can recommend SAP + AI courses. Tell me your background and "
+            "what you'd like to learn, and I'll suggest a learning path."
+        )
+        self.history.add(question, message)
+        return AssistantReply(kind="message", message=message)
+
 
 # --------------------------------------------------------------------------- #
 # CLI entry point for a quick manual test
@@ -253,9 +335,18 @@ def _pretty_print(rec: FinalRecommendation) -> None:
 
 if __name__ == "__main__":
     assistant = CourseRecommendationAssistant()
-    demo_question = (
-        "I am an SAP ABAP developer with no AI experience. "
-        "Which course should I take first to learn SAP Business AI?"
-    )
-    print("Q:", demo_question)
-    _pretty_print(assistant.recommend(demo_question))
+    demo_messages = [
+        "hi",
+        "can you list all courses?",
+        (
+            "I am an SAP ABAP developer with no AI experience. "
+            "Which course should I take first to learn SAP Business AI?"
+        ),
+    ]
+    for msg in demo_messages:
+        print("\nQ:", msg)
+        reply = assistant.chat(msg)
+        if reply.kind == "recommendation":
+            _pretty_print(reply.recommendation)
+        else:
+            print("A:", reply.message)

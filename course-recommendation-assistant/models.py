@@ -4,9 +4,35 @@ Bonus requirement #3: the result is returned as a Pydantic model.
 Bonus requirement #4: source metadata is attached to each recommendation.
 """
 
-from typing import List
+from typing import List, Literal
 
 from pydantic import BaseModel, Field
+
+
+class RouterDecision(BaseModel):
+    """Decides how to handle an incoming message.
+
+    ``recommend`` -> the user wants course guidance, so run the RAG
+    recommendation. ``general`` -> greetings, catalog listing, questions about a
+    course, or anything else; answer conversationally via ``reply``.
+    """
+
+    intent: Literal["recommend", "general"] = Field(
+        ...,
+        description=(
+            "'recommend' when the user asks which course(s) to take, what to "
+            "learn, a learning path, or describes their background seeking "
+            "guidance. 'general' for greetings, small talk, listing/browsing "
+            "the catalog, questions about a specific course, or anything else."
+        ),
+    )
+    reply: str = Field(
+        default="",
+        description=(
+            "A helpful, friendly reply. Fill this ONLY when intent is "
+            "'general'. Leave empty when intent is 'recommend'."
+        ),
+    )
 
 
 class SourceMetadata(BaseModel):

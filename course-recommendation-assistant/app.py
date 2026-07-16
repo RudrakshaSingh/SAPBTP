@@ -63,45 +63,54 @@ if prompt:
         try:
             assistant = get_assistant()
             with st.spinner("Thinking…"):
-                rec = assistant.recommend(prompt)
+                reply = assistant.chat(prompt)
 
-            names = [s.course_name for s in rec.sources] or rec.recommended_courses
-            st.markdown("**Recommended courses:** " + ", ".join(names))
-            st.markdown(f"**Reason:** {rec.reason}")
-
-            if rec.prerequisites:
-                st.markdown("**Prerequisites:**")
-                for pre in rec.prerequisites:
-                    st.markdown(f"- {pre}")
-
-            if rec.learning_sequence:
-                st.markdown(
-                    "**Learning sequence:** " + " → ".join(rec.learning_sequence)
+            # General reply (greeting, catalog listing, a question) — no forced
+            # recommendation.
+            if reply.kind == "message":
+                st.markdown(reply.message)
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": reply.message}
                 )
+            else:
+                rec = reply.recommendation
+                names = [s.course_name for s in rec.sources] or rec.recommended_courses
+                st.markdown("**Recommended courses:** " + ", ".join(names))
+                st.markdown(f"**Reason:** {rec.reason}")
 
-            col1, col2 = st.columns(2)
-            col1.metric("Total learning hours", f"{rec.total_learning_hours} h")
-            col2.metric("Confidence", f"{rec.confidence:.0%}")
+                if rec.prerequisites:
+                    st.markdown("**Prerequisites:**")
+                    for pre in rec.prerequisites:
+                        st.markdown(f"- {pre}")
 
-            with st.expander("Sources (metadata)"):
-                for src in rec.sources:
+                if rec.learning_sequence:
                     st.markdown(
-                        f"- **{src.course_id}** — {src.course_name} "
-                        f"· {src.experience_level} · {src.duration} "
-                        f"· `{src.source}`"
+                        "**Learning sequence:** " + " → ".join(rec.learning_sequence)
                     )
 
-            with st.expander("Raw structured output (Pydantic)"):
-                st.json(rec.model_dump())
+                col1, col2 = st.columns(2)
+                col1.metric("Total learning hours", f"{rec.total_learning_hours} h")
+                col2.metric("Confidence", f"{rec.confidence:.0%}")
 
-            # Store a compact summary for the visible chat transcript.
-            summary = (
-                f"**Recommended:** {', '.join(names)}\n\n{rec.reason}\n\n"
-                f"_Total: {rec.total_learning_hours}h · "
-                f"Confidence: {rec.confidence:.0%}_"
-            )
-            st.session_state.messages.append(
-                {"role": "assistant", "content": summary}
-            )
+                with st.expander("Sources (metadata)"):
+                    for src in rec.sources:
+                        st.markdown(
+                            f"- **{src.course_id}** — {src.course_name} "
+                            f"· {src.experience_level} · {src.duration} "
+                            f"· `{src.source}`"
+                        )
+
+                with st.expander("Raw structured output (Pydantic)"):
+                    st.json(rec.model_dump())
+
+                # Store a compact summary for the visible chat transcript.
+                summary = (
+                    f"**Recommended:** {', '.join(names)}\n\n{rec.reason}\n\n"
+                    f"_Total: {rec.total_learning_hours}h · "
+                    f"Confidence: {rec.confidence:.0%}_"
+                )
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": summary}
+                )
         except Exception as exc:  # noqa: BLE001 - surface any setup error to the UI
             st.error(f"Something went wrong: {exc}")
