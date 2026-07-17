@@ -1,0 +1,542 @@
+======================================================================
+TASK 1 -- DATA EXPLORATION
+======================================================================
+
+Records: 21   Columns: 13
+
+First five rows:
+  incident_id incident_date          sap_module               category priority                                       issue_summary                                                                                                                                                                                        issue_description                                 root_cause                                                         resolution              owner_team  resolution_time_hours  status  excel_row
+0    INC-1001    2024-01-12              SAP MM     Invoice Management       P2  Supplier invoice blocked because of price variance  The supplier invoice posted through MIRO was blocked for payment. The invoice value did not match the purchase-order value and the system raised a price-variance block, so the payment run skipped it.  Incorrect purchase-order condition record                 Corrected condition record and reprocessed invoice  Procure-to-Pay Support                    3.5  Closed          2
+1    INC-1002    2024-01-19            SAP HANA  Database Availability       P1                    HANA database became unavailable                              The production HANA database stopped accepting connections during the month-end close. The index server terminated and users could not log on to any connected application.                   Severe memory exhaustion  Released memory, restarted service and adjusted allocation limits  Database Platform Team                    5.0  Closed          3
+2    INC-1003    2024-02-02              SAP SD                Pricing       P3                   Incorrect discount in sales order                                                               Sales orders created for a customer group applied a larger discount than the agreed contract value, which understated the net order value.       Incorrect pricing procedure sequence                    Corrected condition sequence and repriced order   Order-to-Cash Support                    1.2  Closed          4
+3    INC-1004    2024-02-14             SAP BTP           Connectivity       P1     Application could not connect to backend system                           A Cloud Foundry application on SAP BTP failed every call to the on-premise backend with an authentication error. The destination test connection also failed from the cockpit.            Expired destination credentials           Renewed credentials and corrected destination properties       BTP Platform Team                    7.5  Closed          5
+4    INC-1005    2024-02-21  SAP SuccessFactors            Integration       P2                    Employee replication was delayed                                                                        Employee master data replication from SuccessFactors to the ERP system stopped for two days. New joiners were missing in payroll.          Mapping error in integration flow                        Corrected mapping and reran integration job     HR Integration Team                    4.0  Closed          6
+
+Column names:
+['incident_id', 'incident_date', 'sap_module', 'category', 'priority', 'issue_summary', 'issue_description', 'root_cause', 'resolution', 'owner_team', 'resolution_time_hours', 'status', 'excel_row']
+
+Data types:
+incident_id                  str
+incident_date                str
+sap_module                   str
+category                     str
+priority                     str
+issue_summary                str
+issue_description            str
+root_cause                   str
+resolution                   str
+owner_team                   str
+resolution_time_hours    float64
+status                       str
+excel_row                  int64
+
+Missing values per column:
+incident_id              1
+incident_date            1
+sap_module               1
+category                 1
+priority                 1
+issue_summary            1
+issue_description        1
+root_cause               2
+resolution               1
+owner_team               1
+resolution_time_hours    1
+status                   1
+
+Incidents by SAP module:
+sap_module
+SAP BTP               5
+SAP MM                4
+SAP HANA              4
+SAP SD                3
+SAP SuccessFactors    3
+NaN                   1
+  sap hana            1
+
+Incidents by priority:
+priority
+P2     8
+P1     6
+P3     5
+NaN    1
+p2     1
+
+======================================================================
+TASK 2 -- CLEANING
+======================================================================
+
+Dropped 1 completely empty row(s).
+Clean records: 20
+Modules after normalisation: ['SAP BTP', 'SAP HANA', 'SAP MM', 'SAP SD', 'SAP SuccessFactors']
+Priorities after normalisation: ['P1', 'P2', 'P3']
+
+======================================================================
+TASKS 3-4 -- DOCUMENTS AND CHUNKS
+======================================================================
+
+Documents: 20   Chunks: 20
+Records that needed splitting: 0
+Longest record: 587 chars
+
+Example document (INC-1006):
+Incident ID: INC-1006
+Incident Date: 2024-03-05
+SAP Module: SAP HANA
+Priority: P1
+Category: Performance
+Issue Summary: Critical transactions became slow
+Issue Description: Users experienced severe performance degradation. Business-critical transactions that normally finish in seconds took several minutes, and the delta merge queue kept growing.
+Root Cause: Long-running savepoint and storage pressure
+Resolution: Corrected storage pressure and optimized workload
+Owner Team: Database Platform Team
+Resolution Time: 9 hours
+Status: Closed
+
+Metadata: {'source_type': 'excel', 'source_name': 'sap_incidents.xlsx', 'sheet_name': 'incidents', 'row_number': 7, 'incident_id': 'INC-1006', 'sap_module': 'SAP HANA', 'priority': 'P1', 'category': 'Performance', 'owner_team': 'Database Platform Team', 'chunk_id': 'INC-1006-chunk-1', 'chunk_index': 1, 'chunk_total': 1}
+
+======================================================================
+TASKS 5-6 -- EMBEDDINGS AND VECTOR STORE
+======================================================================
+
+Embedding model: models/gemini-embedding-001
+Test question vector length: 3072
+First five dimensions: [-0.0228, 0.0027, 0.0043, -0.0575, -0.0003]
+Indexed 20 vectors in FAISS.
+
+======================================================================
+TASK 7 -- SEMANTIC RETRIEVAL
+======================================================================
+
+Query: Which incident was related to HANA memory exhaustion?
+
+  Rank 1 | score (L2 distance, lower is closer): 0.3892
+  Incident: INC-1002 | Module: SAP HANA | Priority: P1 | Excel row: 3
+  Chunk ID: INC-1002-chunk-1
+      Incident ID: INC-1002
+      Incident Date: 2024-01-19
+      SAP Module: SAP HANA
+      Priority: P1
+      Category: Database Availability
+      Issue Summary: HANA database became unavailable
+      Issue Description: The production HANA database stopped accepting connections during the month-end close. The index server terminated and users could not log on to any connected application.
+      Root Cause: Severe memory exhaustion
+      Resolution: Released memory, restarted service and adjusted allocation limits
+      Owner Team: Database Platform Team
+      Resolution Time: 5 hours
+      Status: Closed
+
+  Rank 2 | score (L2 distance, lower is closer): 0.4730
+  Incident: INC-1006 | Module: SAP HANA | Priority: P1 | Excel row: 7
+  Chunk ID: INC-1006-chunk-1
+      Incident ID: INC-1006
+      Incident Date: 2024-03-05
+      SAP Module: SAP HANA
+      Priority: P1
+      Category: Performance
+      Issue Summary: Critical transactions became slow
+      Issue Description: Users experienced severe performance degradation. Business-critical transactions that normally finish in seconds took several minutes, and the delta merge queue kept growing.
+      Root Cause: Long-running savepoint and storage pressure
+      Resolution: Corrected storage pressure and optimized workload
+      Owner Team: Database Platform Team
+      Resolution Time: 9 hours
+      Status: Closed
+
+  Rank 3 | score (L2 distance, lower is closer): 0.5154
+  Incident: INC-1009 | Module: SAP HANA | Priority: P2 | Excel row: 11
+  Chunk ID: INC-1009-chunk-1
+      Incident ID: INC-1009
+      Incident Date: 2024-03-26
+      SAP Module: SAP HANA
+      Priority: P2
+      Category: Backup
+      Issue Summary: Nightly backup job failed
+      Issue Description: The scheduled full backup of the HANA production tenant failed with a write error and no usable backup existed for that day.
+      Root Cause: Backup target file system was full
+      Resolution: Freed space on the backup volume and reran the full backup
+      Owner Team: Database Platform Team
+      Resolution Time: 2.75 hours
+      Status: Closed
+
+Query: Find incidents involving SAP BTP connectivity problems.
+
+  Rank 1 | score (L2 distance, lower is closer): 0.3732
+  Incident: INC-1010 | Module: SAP BTP | Priority: P2 | Excel row: 12
+  Chunk ID: INC-1010-chunk-1
+      Incident ID: INC-1010
+      Incident Date: 2024-04-01
+      SAP Module: SAP BTP
+      Priority: P2
+      Category: Connectivity
+      Issue Summary: Cloud Connector tunnel dropped intermittently
+      Issue Description: The Cloud Connector lost its tunnel to the BTP subaccount several times a day. Applications calling the on-premise system failed during each outage window.
+      Root Cause: Firewall idle-timeout closed the tunnel connection
+      Resolution: Adjusted the firewall idle timeout and enabled keep-alive on the Cloud Connector
+      Owner Team: BTP Platform Team
+      Resolution Time: 6 hours
+      Status: Closed
+
+  Rank 2 | score (L2 distance, lower is closer): 0.3875
+  Incident: INC-1004 | Module: SAP BTP | Priority: P1 | Excel row: 5
+  Chunk ID: INC-1004-chunk-1
+      Incident ID: INC-1004
+      Incident Date: 2024-02-14
+      SAP Module: SAP BTP
+      Priority: P1
+      Category: Connectivity
+      Issue Summary: Application could not connect to backend system
+      Issue Description: A Cloud Foundry application on SAP BTP failed every call to the on-premise backend with an authentication error. The destination test connection also failed from the cockpit.
+      Root Cause: Expired destination credentials
+      Resolution: Renewed credentials and corrected destination properties
+      Owner Team: BTP Platform Team
+      Resolution Time: 7.5 hours
+      Status: Closed
+
+  Rank 3 | score (L2 distance, lower is closer): 0.4779
+  Incident: INC-1015 | Module: SAP BTP | Priority: P1 | Excel row: 17
+  Chunk ID: INC-1015-chunk-1
+      Incident ID: INC-1015
+      Incident Date: 2024-05-10
+      SAP Module: SAP BTP
+      Priority: P1
+      Category: Integration
+      Issue Summary: Integration Suite iFlow stopped processing messages
+      Issue Description: Messages piled up in the queue and none reached the receiver system. The iFlow showed a permanent error status.
+      Root Cause: Expired client certificate on the receiver channel
+      Resolution: Deployed a renewed certificate and restarted the iFlow
+      Owner Team: BTP Platform Team
+      Resolution Time: 8 hours
+      Status: Closed
+
+Query: Which issue was caused by an incorrect pricing procedure?
+
+  Rank 1 | score (L2 distance, lower is closer): 0.4884
+  Incident: INC-1003 | Module: SAP SD | Priority: P3 | Excel row: 4
+  Chunk ID: INC-1003-chunk-1
+      Incident ID: INC-1003
+      Incident Date: 2024-02-02
+      SAP Module: SAP SD
+      Priority: P3
+      Category: Pricing
+      Issue Summary: Incorrect discount in sales order
+      Issue Description: Sales orders created for a customer group applied a larger discount than the agreed contract value, which understated the net order value.
+      Root Cause: Incorrect pricing procedure sequence
+      Resolution: Corrected condition sequence and repriced order
+      Owner Team: Order-to-Cash Support
+      Resolution Time: 1.2 hours
+      Status: Closed
+
+  Rank 2 | score (L2 distance, lower is closer): 0.5760
+  Incident: INC-1001 | Module: SAP MM | Priority: P2 | Excel row: 2
+  Chunk ID: INC-1001-chunk-1
+      Incident ID: INC-1001
+      Incident Date: 2024-01-12
+      SAP Module: SAP MM
+      Priority: P2
+      Category: Invoice Management
+      Issue Summary: Supplier invoice blocked because of price variance
+      Issue Description: The supplier invoice posted through MIRO was blocked for payment. The invoice value did not match the purchase-order value and the system raised a price-variance block, so the payment run skipped it.
+      Root Cause: Incorrect purchase-order condition record
+      Resolution: Corrected condition record and reprocessed invoice
+      Owner Team: Procure-to-Pay Support
+      Resolution Time: 3.5 hours
+      Status: Closed
+
+  Rank 3 | score (L2 distance, lower is closer): 0.6045
+  Incident: INC-1011 | Module: SAP SD | Priority: P2 | Excel row: 13
+  Chunk ID: INC-1011-chunk-1
+      Incident ID: INC-1011
+      Incident Date: 2024-04-08
+      SAP Module: SAP SD
+      Priority: P2
+      Category: Billing
+      Issue Summary: Billing documents stuck in the accounting interface
+      Issue Description: Billing documents were created but not released to accounting, so revenue was missing from the general ledger.
+      Root Cause: Missing account determination for a new material group
+      Resolution: Maintained account determination and released the documents
+      Owner Team: Order-to-Cash Support
+      Resolution Time: 3 hours
+      Status: Closed
+
+Query: Show incidents related to employee integration failures.
+
+  Rank 1 | score (L2 distance, lower is closer): 0.4457
+  Incident: INC-1005 | Module: SAP SuccessFactors | Priority: P2 | Excel row: 6
+  Chunk ID: INC-1005-chunk-1
+      Incident ID: INC-1005
+      Incident Date: 2024-02-21
+      SAP Module: SAP SuccessFactors
+      Priority: P2
+      Category: Integration
+      Issue Summary: Employee replication was delayed
+      Issue Description: Employee master data replication from SuccessFactors to the ERP system stopped for two days. New joiners were missing in payroll.
+      Root Cause: Mapping error in integration flow
+      Resolution: Corrected mapping and reran integration job
+      Owner Team: HR Integration Team
+      Resolution Time: 4 hours
+      Status: Closed
+
+  Rank 2 | score (L2 distance, lower is closer): 0.4831
+  Incident: INC-1019 | Module: SAP SuccessFactors | Priority: P1 | Excel row: 21
+  Chunk ID: INC-1019-chunk-1
+      Incident ID: INC-1019
+      Incident Date: 2024-06-09
+      SAP Module: SAP SuccessFactors
+      Priority: P1
+      Category: Integration
+      Issue Summary: Payroll interface failed before the pay run
+      Issue Description: The compensation data transfer to payroll aborted, and the pay run could not start on the planned date.
+      Root Cause: Unmapped pay component introduced by a configuration change
+      Resolution: Added the missing mapping and reran the interface
+      Owner Team: HR Integration Team
+      Resolution Time: 6.5 hours
+      Status: Closed
+
+  Rank 3 | score (L2 distance, lower is closer): 0.5186
+  Incident: INC-1013 | Module: SAP SuccessFactors | Priority: P3 | Excel row: 15
+  Chunk ID: INC-1013-chunk-1
+      Incident ID: INC-1013
+      Incident Date: 2024-04-22
+      SAP Module: SAP SuccessFactors
+      Priority: P3
+      Category: Authorization
+      Issue Summary: Managers could not see their team in the org chart
+      Issue Description: Several managers reported an empty org chart although their direct reports were maintained correctly in employee central.
+      Root Cause: Not documented
+      Resolution: Rebuilt the role-based permission group and refreshed the cache
+      Owner Team: HR Integration Team
+      Resolution Time: 2 hours
+      Status: Closed
+
+======================================================================
+TASK 8 -- METADATA FILTERING
+======================================================================
+
+Filters: {'priority': 'P1'}
+
+Query: Show the most critical incidents.
+
+  Rank 1 | score (L2 distance, lower is closer): 0.5577
+  Incident: INC-1006 | Module: SAP HANA | Priority: P1 | Excel row: 7
+  Chunk ID: INC-1006-chunk-1
+
+  Rank 2 | score (L2 distance, lower is closer): 0.5699
+  Incident: INC-1002 | Module: SAP HANA | Priority: P1 | Excel row: 3
+  Chunk ID: INC-1002-chunk-1
+
+  Rank 3 | score (L2 distance, lower is closer): 0.5932
+  Incident: INC-1012 | Module: SAP MM | Priority: P1 | Excel row: 14
+  Chunk ID: INC-1012-chunk-1
+
+Filters: {'sap_module': 'SAP HANA'}
+
+Query: Database problems.
+
+  Rank 1 | score (L2 distance, lower is closer): 0.6270
+  Incident: INC-1002 | Module: SAP HANA | Priority: P1 | Excel row: 3
+  Chunk ID: INC-1002-chunk-1
+
+  Rank 2 | score (L2 distance, lower is closer): 0.6653
+  Incident: INC-1017 | Module: SAP HANA | Priority: P3 | Excel row: 19
+  Chunk ID: INC-1017-chunk-1
+
+  Rank 3 | score (L2 distance, lower is closer): 0.6711
+  Incident: INC-1009 | Module: SAP HANA | Priority: P2 | Excel row: 11
+  Chunk ID: INC-1009-chunk-1
+
+Filters: {'sap_module': 'SAP BTP', 'owner_team': 'BTP Platform Team'}
+
+Query: Access and connection issues.
+
+  Rank 1 | score (L2 distance, lower is closer): 0.6134
+  Incident: INC-1004 | Module: SAP BTP | Priority: P1 | Excel row: 5
+  Chunk ID: INC-1004-chunk-1
+
+  Rank 2 | score (L2 distance, lower is closer): 0.6457
+  Incident: INC-1008 | Module: SAP BTP | Priority: P2 | Excel row: 9
+  Chunk ID: INC-1008-chunk-1
+
+  Rank 3 | score (L2 distance, lower is closer): 0.6570
+  Incident: INC-1010 | Module: SAP BTP | Priority: P2 | Excel row: 12
+  Chunk ID: INC-1010-chunk-1
+
+======================================================================
+MANDATORY TEST QUESTIONS
+======================================================================
+
+Q: What was the resolution for incident INC-1004?
+   [route: semantic]
+
+A: For incident INC-1004, which occurred in the SAP BTP module with a priority of P1, the resolution involved renewing the expired credentials and correcting the destination properties. Source: sap_incidents.xlsx, Excel row 5.
+
+   Sources used:
+     - INC-1014 | SAP HANA | P2 | sap_incidents.xlsx row 16
+     - INC-1004 | SAP BTP | P1 | sap_incidents.xlsx row 5
+     - INC-1002 | SAP HANA | P1 | sap_incidents.xlsx row 3
+     - INC-1006 | SAP HANA | P1 | sap_incidents.xlsx row 7
+     - INC-1009 | SAP HANA | P2 | sap_incidents.xlsx row 11
+----------------------------------------------------------------------
+
+Q: Which team resolved the employee replication issue?
+   [route: semantic]
+
+A: The HR Integration Team resolved the employee replication issue, as documented in incident INC-1005 (SAP SuccessFactors, Priority P2). The resolution involved correcting the mapping and rerunning the integration job. Source: sap_incidents.xlsx, Excel row 6.
+
+   Sources used:
+     - INC-1005 | SAP SuccessFactors | P2 | sap_incidents.xlsx row 6
+     - INC-1013 | SAP SuccessFactors | P3 | sap_incidents.xlsx row 15
+     - INC-1017 | SAP HANA | P3 | sap_incidents.xlsx row 19
+     - INC-1019 | SAP SuccessFactors | P1 | sap_incidents.xlsx row 21
+     - INC-1014 | SAP HANA | P2 | sap_incidents.xlsx row 16
+----------------------------------------------------------------------
+
+Q: Has there been an issue where a cloud application could not connect to an SAP backend?
+   [route: semantic]
+
+A: Yes, there have been incidents where cloud applications could not connect to an SAP backend:
+
+*   In incident INC-1004 (SAP BTP, Priority P1), a Cloud Foundry application failed to connect to an on-premise backend due to expired destination credentials. The resolution involved renewing the credentials and correcting the destination properties. Source: sap_incidents.xlsx, Excel row 5.
+*   In incident INC-1010 (SAP BTP, Priority P2), the Cloud Connector tunnel dropped intermittently, causing applications to fail when calling the on-premise system. The resolution involved adjusting the firewall idle timeout and enabling keep-alive on the Cloud Connector. Source: sap_incidents.xlsx, Excel row 12.
+*   In incident INC-1015 (SAP BTP, Priority P1), an Integration Suite iFlow stopped processing messages to a receiver system due to an expired client certificate. The resolution involved deploying a renewed certificate and restarting the iFlow. Source: sap_incidents.xlsx, Excel row 17.
+
+   Sources used:
+     - INC-1004 | SAP BTP | P1 | sap_incidents.xlsx row 5
+     - INC-1010 | SAP BTP | P2 | sap_incidents.xlsx row 12
+     - INC-1008 | SAP BTP | P2 | sap_incidents.xlsx row 9
+     - INC-1002 | SAP HANA | P1 | sap_incidents.xlsx row 3
+     - INC-1015 | SAP BTP | P1 | sap_incidents.xlsx row 17
+----------------------------------------------------------------------
+
+Q: Find a previous incident involving database memory problems.
+   [route: semantic]
+
+A: Incident INC-1002, which occurred in the SAP HANA module with a priority of P1, involved database memory problems caused by severe memory exhaustion. The resolution involved releasing memory, restarting the service, and adjusting allocation limits. Source: sap_incidents.xlsx, Excel row 3.
+
+   Sources used:
+     - INC-1002 | SAP HANA | P1 | sap_incidents.xlsx row 3
+     - INC-1006 | SAP HANA | P1 | sap_incidents.xlsx row 7
+     - INC-1017 | SAP HANA | P3 | sap_incidents.xlsx row 19
+     - INC-1009 | SAP HANA | P2 | sap_incidents.xlsx row 11
+     - INC-1014 | SAP HANA | P2 | sap_incidents.xlsx row 16
+----------------------------------------------------------------------
+
+Q: Which P1 incident took the longest time to resolve?
+   [route: analytical (Pandas)]
+
+A: The P1 incident that took the longest time to resolve is INC-1006, with a resolution time of 9 hours.
+
+Source: sap_incidents.xlsx (computed with Pandas over all rows).
+----------------------------------------------------------------------
+
+Q: Compare the two SAP HANA P1 incidents.
+   [route: semantic]
+
+A: The two P1 incidents for the SAP HANA module are INC-1002 and INC-1006.
+
+In incident INC-1002 (Source: sap_incidents.xlsx, Excel row 3), the database became unavailable due to severe memory exhaustion, which caused the index server to terminate. The resolution involved releasing memory, restarting the service, and adjusting allocation limits.
+
+In incident INC-1006 (Source: sap_incidents.xlsx, Excel row 7), users experienced severe performance degradation caused by a long-running savepoint and storage pressure, which led to a growing delta merge queue. The resolution involved correcting the storage pressure and optimizing the workload.
+
+   Sources used:
+     - INC-1002 | SAP HANA | P1 | sap_incidents.xlsx row 3
+     - INC-1006 | SAP HANA | P1 | sap_incidents.xlsx row 7
+     - INC-1014 | SAP HANA | P2 | sap_incidents.xlsx row 16
+     - INC-1017 | SAP HANA | P3 | sap_incidents.xlsx row 19
+     - INC-1009 | SAP HANA | P2 | sap_incidents.xlsx row 11
+----------------------------------------------------------------------
+
+Q: Show only P1 SAP BTP incidents.
+   [route: semantic]
+
+A: There are two P1 incidents for the SAP BTP module:
+
+1. Incident INC-1015 (Source: sap_incidents.xlsx, Excel row 17) involved an Integration Suite iFlow that stopped processing messages due to an expired client certificate. The resolution required deploying a renewed certificate and restarting the iFlow.
+
+2. Incident INC-1004 (Source: sap_incidents.xlsx, Excel row 5) involved a Cloud Foundry application failing to connect to an on-premise backend due to expired destination credentials. The resolution involved renewing the credentials and correcting the destination properties.
+
+   Sources used:
+     - INC-1015 | SAP BTP | P1 | sap_incidents.xlsx row 17
+     - INC-1004 | SAP BTP | P1 | sap_incidents.xlsx row 5
+----------------------------------------------------------------------
+
+Q: Find SAP MM incidents handled by the Procure-to-Pay Support team.
+   [route: semantic]
+
+A: The Procure-to-Pay Support team handled the following SAP MM incidents:
+
+*   **INC-1007** (Priority P3): The issue involved purchase orders bypassing the release workflow. The resolution involved correcting the release strategy and regenerating the classification. Source: sap_incidents.xlsx, Excel row 8.
+*   **INC-1018** (Priority P2): The issue involved duplicate supplier invoice postings. The resolution involved activating the duplicate check and reversing the extra document. Source: sap_incidents.xlsx, Excel row 20.
+*   **INC-1001** (Priority P2): The issue involved a supplier invoice blocked due to price variance. The resolution involved correcting the purchase-order condition record and reprocessing the invoice. Source: sap_incidents.xlsx, Excel row 2.
+*   **INC-1012** (Priority P1): The issue involved failed goods receipt postings due to an exhausted number range. The resolution involved extending the number range interval and reposting the documents. Source: sap_incidents.xlsx, Excel row 14.
+
+   Sources used:
+     - INC-1007 | SAP MM | P3 | sap_incidents.xlsx row 8
+     - INC-1018 | SAP MM | P2 | sap_incidents.xlsx row 20
+     - INC-1001 | SAP MM | P2 | sap_incidents.xlsx row 2
+     - INC-1012 | SAP MM | P1 | sap_incidents.xlsx row 14
+----------------------------------------------------------------------
+
+Q: A user reports that a BTP application cannot access the backend because authentication is failing. Which previous incident is most similar, and what resolution should the support team investigate?
+   [route: semantic]
+
+A: The most similar incident is INC-1004 (SAP module: SAP BTP, Priority: P1), where an application failed to connect to an on-premise backend due to authentication errors. Source: sap_incidents.xlsx, Excel row 5.
+
+To resolve this, the support team should investigate the destination credentials and properties, as the resolution for INC-1004 involved renewing expired credentials and correcting the destination properties. Source: sap_incidents.xlsx, Excel row 5.
+
+   Sources used:
+     - INC-1004 | SAP BTP | P1 | sap_incidents.xlsx row 5
+     - INC-1008 | SAP BTP | P2 | sap_incidents.xlsx row 9
+     - INC-1020 | SAP BTP | P3 | sap_incidents.xlsx row 22
+     - INC-1015 | SAP BTP | P1 | sap_incidents.xlsx row 17
+     - INC-1010 | SAP BTP | P2 | sap_incidents.xlsx row 12
+----------------------------------------------------------------------
+
+Q: What is the annual revenue of the company?
+   [route: analytical (Pandas)]
+
+A: I could not find sufficient information in the incident dataset to answer this question. Source: sap_incidents.xlsx (computed with Pandas over all rows).
+----------------------------------------------------------------------
+
+======================================================================
+SECTION 11 -- ANALYTICAL QUESTIONS ROUTED TO PANDAS
+======================================================================
+
+Q: What is the average resolution time for SAP HANA incidents?
+   [route: analytical (Pandas)]
+
+A: The average resolution time for SAP HANA incidents is 5.10 hours.
+
+Source: sap_incidents.xlsx (computed with Pandas over all rows).
+----------------------------------------------------------------------
+
+Q: How many P1 incidents were reported?
+   [route: analytical (Pandas)]
+
+A: There were 6 P1 incidents reported.
+
+Source: sap_incidents.xlsx (computed with Pandas over all rows).
+----------------------------------------------------------------------
+
+Q: Which module has the highest average resolution time?
+   [route: analytical (Pandas)]
+
+A: The SAP HANA module has the highest average resolution time at 5.10 hours.
+
+Source: sap_incidents.xlsx (computed with Pandas over all rows).
+----------------------------------------------------------------------
+
+======================================================================
+SECTION 8 -- EXPECTED FINAL OUTPUT
+======================================================================
+
+Q: Which P1 SAP HANA incident took the longest to resolve?
+   [route: semantic]
+
+A: The P1 SAP HANA incident that took the longest to resolve was INC-1006, which required 9 hours to reach a resolution. Source: sap_incidents.xlsx, Excel row 7. In this incident, the resolution involved correcting storage pressure and optimizing the workload to address performance degradation caused by a long-running savepoint and storage pressure. Source: sap_incidents.xlsx, Excel row 7. 
+
+In comparison, incident INC-1002, also a P1 SAP HANA incident, was resolved in 5 hours by releasing memory, restarting the service, and adjusting allocation limits to address database unavailability caused by memory exhaustion. Source: sap_incidents.xlsx, Excel row 3.
+
+   Sources used:
+     - INC-1006 | SAP HANA | P1 | sap_incidents.xlsx row 7
+     - INC-1002 | SAP HANA | P1 | sap_incidents.xlsx row 3
+----------------------------------------------------------------------
