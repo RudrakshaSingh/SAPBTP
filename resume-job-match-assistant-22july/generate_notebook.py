@@ -139,8 +139,12 @@ INSTALL = """
 TASK_2 = """
 ## Task 2 -- Configure Gemini
 
-Paste your key from [Google AI Studio](https://aistudio.google.com/apikey). `getpass` keeps
-it off the screen so the notebook can be shared without leaking it.
+A local `.env` file is tried first, so restarting the kernel does not mean retyping the key.
+In Colab there is no `.env`, so it falls through to `getpass` -- which keeps the key off the
+screen, and out of the notebook when you share it.
+
+In VS Code the `getpass` box opens at the **top-centre of the window**, like the command
+palette. Clicking anywhere else dismisses it and the cell waits forever, so watch for it.
 
 The model itself is built further down in `get_llm()`, lazily -- so every cell up to Task 7
 runs whether or not the key is valid, and only the actual screening needs the network.
@@ -150,7 +154,17 @@ KEY = """
 import os
 from getpass import getpass
 
-os.environ["GOOGLE_API_KEY"] = getpass("Enter your Google AI Studio API key: ")
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
+
+if not os.getenv("GOOGLE_API_KEY"):
+    os.environ["GOOGLE_API_KEY"] = getpass("Enter your Google AI Studio API key: ")
+
+print("key loaded:", bool(os.getenv("GOOGLE_API_KEY")))
 """
 
 TASK_3 = """

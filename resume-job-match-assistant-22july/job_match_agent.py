@@ -299,9 +299,28 @@ def _match_with_llm(resume: dict, jd: dict) -> SkillMatch:
     )
 
 
+def _text_of(message) -> str:
+    """Pull the plain text out of a chat message.
+
+    ``content`` is not always a string. Gemini 2.5 answers with a list of content
+    blocks -- ``[{"type": "reasoning", ...}, {"type": "text", "text": "..."}]`` --
+    and calling ``.strip()`` on that list is an AttributeError. Blocks without a
+    ``text`` key are the model's own reasoning and are dropped on purpose; only
+    what it actually said belongs in the report.
+    """
+    content = message.content
+    if isinstance(content, str):
+        return content.strip()
+    parts = [
+        block if isinstance(block, str) else block.get("text", "")
+        for block in content
+    ]
+    return "".join(parts).strip()
+
+
 def _write_with_llm(prompt: ChatPromptTemplate, **values) -> str:
     """Run one of the prose prompts and return the text."""
-    return (prompt | get_llm()).invoke(values).content.strip()
+    return _text_of((prompt | get_llm()).invoke(values))
 
 
 # --------------------------------------------------------------------------- #
