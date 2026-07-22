@@ -42,8 +42,8 @@ Problems 10–14 have a working implementation in this repository:
 
 | #   | Problem                              | Implementation                                                                                |
 | --- | ------------------------------------ | --------------------------------------------------------------------------------------------- |
-| 10  | SmartKart Customer Support Assistant | [`smartkart-support-assistant-14july/`](../smartkart-support-assistant-14july/)               |
-| 11  | Course Recommendation Assistant      | [`course-recommendation-assistant 15 july/`](../course-recommendation-assistant%2015%20july/) |
-| 12  | SAP Incident Knowledge Assistant     | [`sap-incident-knowledge-assistant16july/`](../sap-incident-knowledge-assistant16july/)       |
-| 13  | SAP Support Agent                    | [`sap-support-agent-langgraph21july/`](../sap-support-agent-langgraph21july/)                 |
+| 10  | SmartKart Customer Support Assistant | [`10-smartkart-support-assistant-14july/`](../10-smartkart-support-assistant-14july/)               |
+| 11  | Course Recommendation Assistant      | [`11-course-recommendation-assistant 15 july/`](../11-course-recommendation-assistant%2015%20july/) |
+| 12  | SAP Incident Knowledge Assistant     | [`12-sap-incident-knowledge-assistant16july/`](../12-sap-incident-knowledge-assistant16july/)       |
+| 13  | SAP Support Agent                    | [`13-sap-support-agent-langgraph21july/`](../13-sap-support-agent-langgraph21july/)                 |
 | 14  | Resume-to-Job Match Assistant        | [`resume-job-match-assistant-22july/`](../resume-job-match-assistant-22july/)                 |

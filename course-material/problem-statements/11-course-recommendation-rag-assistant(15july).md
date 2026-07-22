@@ -6,7 +6,7 @@
 | **Domain** | EdTech / Learning & Development |
 | **Topic** | Retrieval-Augmented Generation, vector search, Pydantic structured output |
 | **Stack** | Python · LangChain · Google Gemini · Gemini Embeddings · FAISS · Pydantic · Streamlit |
-| **Implementation** | [`course-recommendation-assistant 15 july/`](../course-recommendation-assistant%2015%20july/) |
+| **Implementation** | [`11-course-recommendation-assistant 15 july/`](../11-course-recommendation-assistant%2015%20july/) |
 
 ---
 

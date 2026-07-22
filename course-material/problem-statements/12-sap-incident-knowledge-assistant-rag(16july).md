@@ -6,7 +6,7 @@
 | **Domain** | Enterprise IT Support / SAP Operations |
 | **Topic** | RAG over structured (tabular) data, row-aware chunking, metadata filtering |
 | **Stack** | Python · Pandas · OpenPyXL · LangChain · Google Gemini · Gemini Embeddings · ChromaDB or FAISS |
-| **Implementation** | [`sap-incident-knowledge-assistant16july/`](../sap-incident-knowledge-assistant16july/) |
+| **Implementation** | [`12-sap-incident-knowledge-assistant16july/`](../12-sap-incident-knowledge-assistant16july/) |
 
 ---
 

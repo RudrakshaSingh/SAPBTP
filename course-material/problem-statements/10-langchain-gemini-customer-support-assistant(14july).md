@@ -7,7 +7,7 @@
 | **Topic** | LLM App Development — LangChain, Gemini, LCEL, Pydantic, Tool Calling |
 | **Duration** | ~4 Hours |
 | **Out of scope** | **RAG is explicitly excluded from this project.** |
-| **Implementation** | [`smartkart-support-assistant-14july/`](../smartkart-support-assistant-14july/) — modules 1–9 map to Modules 1–13 below |
+| **Implementation** | [`10-smartkart-support-assistant-14july/`](../10-smartkart-support-assistant-14july/) — modules 1–9 map to Modules 1–13 below |
 
 ---
 

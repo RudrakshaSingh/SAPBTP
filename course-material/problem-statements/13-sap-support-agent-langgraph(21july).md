@@ -6,7 +6,7 @@
 | **Domain** | Enterprise IT Support / SAP Operations |
 | **Topic** | Agentic AI — StateGraph, nodes, conditional edges, tools, memory, human-in-the-loop |
 | **Stack** | Python · LangGraph · LangChain · Google Gemini (`gemini-2.5-flash`) |
-| **Implementation** | [`sap-support-agent-langgraph21july/`](../sap-support-agent-langgraph21july/) |
+| **Implementation** | [`13-sap-support-agent-langgraph21july/`](../13-sap-support-agent-langgraph21july/) |
 
 ---
 
