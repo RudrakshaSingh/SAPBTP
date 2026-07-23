@@ -1,13 +1,12 @@
-"""Six documents across three knowledge areas, loaded at startup so ``/ask`` works.
+"""
+STEP 2 -- THE SAMPLE DOCUMENTS
 
-Each entry is ``(source, category, text)``. Two documents per category is
-deliberate: it keeps ``sources_used`` interesting, because naming the category
-is not the same as naming the file the answer came from.
+Normally these would be uploaded files. Keeping them as plain strings means
+the project needs no data folder and no upload step to demonstrate.
 
-The overlap between areas is deliberate too. HR grants a home-office
-*allowance*, finance pays a meal *allowance*; HR mentions the HR portal login,
-IT owns password resets. Those near-collisions are what the category filter is
-for.
+The overlaps between areas are deliberate: HR has a home-office *allowance*
+and Finance has a meal *allowance*; HR mentions the HR portal login and IT
+owns password resets. Those near-collisions are what the filter is for.
 """
 
 HR_LEAVE_POLICY = """
@@ -15,8 +14,6 @@ Annual Leave
 
 Every confirmed full-time employee is entitled to 18 days of paid annual leave
 per calendar year. Leave accrues at 1.5 days per completed month of service.
-Employees serving their probation period earn leave from day one but may only
-apply for it after confirmation.
 
 Casual Leave
 
@@ -25,22 +22,17 @@ calendar year for short personal absences. Casual leave is taken in blocks of no
 more than 2 consecutive days and does not carry forward.
 
 Applications for annual leave must be raised in the HR portal at least 5 working
-days before the first day of leave. Any period of more than 5 consecutive
-working days needs approval from both the reporting manager and the department
-head.
+days before the first day of leave.
 
 Carry Forward
 
 A maximum of 6 unused annual leave days may be carried forward into the next
-calendar year. Carried-forward days must be used before 31 March, after which
-they lapse without compensation.
+calendar year. Carried-forward days must be used before 31 March.
 
 Sick Leave
 
-Employees receive 12 days of paid sick leave per calendar year. Sick leave does
-not carry forward. Absence of 3 or more consecutive days requires a medical
-certificate from a registered practitioner, submitted within 7 days of returning
-to work.
+Employees receive 12 days of paid sick leave per calendar year. Absence of 3 or
+more consecutive days requires a medical certificate.
 """
 
 HR_EMPLOYMENT_TERMS = """
@@ -53,21 +45,18 @@ Standard working hours are 9 hours per day including a 1-hour break, between
 Notice Period
 
 An employee resigning from the company must serve a notice period of 60 days.
-Employees still on probation serve 15 days. The notice period begins on the date
-the resignation is acknowledged by the reporting manager in the HR portal, not
-on the date the email is sent.
+Employees still on probation serve 15 days.
 
 Probation
 
-New employees serve a probation period of 6 months. Confirmation follows a
-review by the reporting manager. Probation may be extended once, by up to 3
-months, with written reasons shared with the employee.
+New employees serve a probation period of 6 months. Probation may be extended
+once, by up to 3 months.
 
 Work From Home
 
-All eligible employees may work from home for up to 2 days per week, booked in
-the HR portal by the end of the previous week. A one-time home-office allowance
-of 15,000 INR is paid after confirmation. Internet charges are not reimbursed.
+All eligible employees may work from home for up to 2 days per week. A one-time
+home-office allowance of 15,000 INR is paid after confirmation. Internet charges
+are not reimbursed.
 """
 
 IT_SUPPORT_FAQ = """
@@ -89,8 +78,7 @@ unlock it sooner after verifying your identity over a video call.
 Email Access
 
 Mailboxes are 50 GB. Mail older than 24 months is archived automatically and
-stays searchable from the archive folder. Requests for a shared mailbox are
-raised by the reporting manager, not by the user.
+stays searchable from the archive folder.
 """
 
 IT_NETWORK_FAQ = """
@@ -105,18 +93,16 @@ The VPN client disconnects on purpose after 12 hours, and after 30 minutes of
 inactivity. Reconnecting is expected in both cases and is not a fault.
 
 If disconnects continue, run the Network Report tool from the company portal and
-attach its output to a helpdesk ticket. Tickets that include the report are
-resolved within 1 working day; tickets without it take up to 3.
+attach its output to a helpdesk ticket.
 
 Wi-Fi and Guest Access
 
 The office network is CORP-SECURE, joined with your domain account. Guest access
-is requested by the host at reception and expires after 24 hours.
+expires after 24 hours.
 
 Hardware Replacement
 
-Laptops are replaced every 4 years, or sooner if a hardware fault is confirmed
-by the helpdesk. A loaner laptop is available while a repair is in progress.
+Laptops are replaced every 4 years, or sooner if a hardware fault is confirmed.
 """
 
 FINANCE_TRAVEL_POLICY = """
@@ -125,7 +111,7 @@ Booking Business Travel
 Domestic travel is booked through the travel desk at least 7 days in advance.
 Employees at grade M3 and above travel by air; all other grades travel by train
 in AC 2-tier. International travel needs written approval from the department
-head before tickets are issued.
+head.
 
 Daily Allowance
 
@@ -134,33 +120,28 @@ The daily meal allowance on business trips is 1,800 INR for metro cities and
 bills must be uploaded within 10 days of returning.
 
 The hotel limit is 6,000 INR per night in metro cities and 4,000 INR elsewhere.
-Anything above the limit is paid by the employee unless approved in advance.
 
 Local Transport
 
-Airport transfers and client visits are reimbursed at actuals. Personal-vehicle
-use is reimbursed at 12 INR per kilometre against a trip log.
+Personal-vehicle use is reimbursed at 12 INR per kilometre against a trip log.
 """
 
 FINANCE_REIMBURSEMENT_RULES = """
 Claim Deadlines
 
 Every reimbursement claim is submitted in the finance portal within 30 days of
-the expense date. Claims older than 30 days need a written exception from the
-finance controller. Approved claims are paid with the next payroll run,
-generally within 15 working days.
+the expense date. Approved claims are paid with the next payroll run, generally
+within 15 working days.
 
 Travel Reimbursement Limit
 
 The total travel reimbursement limit is 50,000 INR per employee per quarter.
-Claims beyond that limit require the department head's approval before
-submission.
+Claims beyond that limit require the department head's approval.
 
 Receipts
 
 Any single expense above 500 INR needs a scanned receipt showing the vendor,
-the date and the amount. Handwritten receipts are accepted only for local
-transport.
+the date and the amount.
 
 Internet and Phone
 

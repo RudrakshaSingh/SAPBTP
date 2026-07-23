@@ -4,7 +4,7 @@ Needs a Gemini key: copy .env.example to .env and paste your key, then
 
     uvicorn app:app --reload
 
-Endpoints: GET /health, POST /ingest, POST /ask. Interactive docs at /docs.
+Endpoints: GET /, GET /health, POST /ingest, POST /ask. Interactive docs at /docs.
 
 The three sample HR documents are loaded at startup so /ask answers straight
 away. Set SEED_SAMPLE_DOCS=false to start with an empty store instead.
@@ -55,6 +55,7 @@ app = FastAPI(
     title="Document Q&A API",
     description="Answers HR questions from your documents using RAG.",
     version="1.0.0",
+    # docs_url="/docs2",    to change the docs URL to the root, default goes to docs
     lifespan=lifespan,
 )
 
@@ -113,9 +114,21 @@ class HealthResponse(BaseModel):
     chunks: int
 
 
+class HomeResponse(BaseModel):
+    message: str
+
+
 # --------------------------------------------------------------------------- #
 # Endpoints
 # --------------------------------------------------------------------------- #
+@app.get("/", response_model=HomeResponse)
+def home() -> HomeResponse:
+    """Landing page, so hitting the root gives something friendlier than a 404."""
+    return HomeResponse(
+        message="Welcome to the Document Q&A API using RAG! Visit /docs for interactive documentation."
+    )
+
+
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
     """Liveness check, plus what is currently loaded."""
@@ -152,3 +165,4 @@ def ask(request: AskRequest) -> AskResponse:
     active = get_store()
     result = answer_question(request.question, active, top_k=request.top_k)
     return AskResponse(answer=result.answer, sources_used=result.sources_used)
+

@@ -1,34 +1,83 @@
-"""Multi-document Q&A API -- FastAPI over the in-memory RAG store, with category filtering.
+"""
+===============================================================================
+ PROBLEM 16 -- MULTI-DOCUMENT Q&A API WITH CATEGORY-BASED SOURCE FILTERING
+===============================================================================
 
-Needs a Gemini key: copy .env.example to .env and paste your key, then
+WHAT THIS DOES
+--------------
+Answers HR / IT / Finance questions from company documents, and lets you
+restrict a question to ONE category so an IT question never gets answered from
+the leave policy.
 
-    uvicorn app:app --reload
+THE IDEA: RAG (Retrieval-Augmented Generation)
+----------------------------------------------
+An AI has never read your company handbook, so if you just ask it "how many
+leave days do I get?" it will invent a number. Instead we:
 
-Endpoints: GET /health, POST /ingest, POST /ask, GET /sources. Docs at /docs.
+    1. Cut the documents into small pieces ("chunks").
+    2. Find the 3 pieces most related to the question.
+    3. Give Gemini ONLY those 3 pieces and say "answer from this, nothing else".
 
-Six sample documents across HR, IT and Finance are loaded at startup so /ask
-answers straight away. Set SEED_SAMPLE_DOCS=false to start with an empty store.
+THE THREE REQUIREMENTS FROM THE PROBLEM STATEMENT
+-------------------------------------------------
+    A) Every chunk remembers its category and source name  -> doc_qa.py, STEP 4
+    B) Filter by category BEFORE searching                 -> doc_qa.py, STEP 5
+    C) The answer says which source(s) it used             -> rag.py,    STEP 7
+
+CONSTRAINT: no external database, in-memory only. That is why the chunks live
+in an ordinary Python list and we compare them ourselves instead of using a
+vector database like Chroma.
+
+WHERE THINGS LIVE
+-----------------
+    config.py       STEP 1     Models, chunk size, top-k, the fallback sentence
+    sample_data.py  STEP 2     The six HR / IT / Finance documents
+    doc_qa.py       STEP 3-5   Chunking, similarity, the store, filtered search
+    rag.py          STEP 6-7   The grounded prompt and the cited answer
+    models.py       STEP 8     Request and response schemas
+    app.py          STEP 9-11  Startup and the four endpoints (this file)
+
+HOW TO RUN
+----------
+    pip install -r requirements.txt
+    python app.py                       (or: uvicorn app:app --reload)
+
+    Then open http://localhost:8000/docs
+
+Needs a Gemini key in a .env file next to this script:
+    GOOGLE_API_KEY=your-key-here
+===============================================================================
 """
 
 from __future__ import annotations
 
-import os
 from contextlib import asynccontextmanager
-from typing import Dict, List, Optional
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field, field_validator
 
-from doc_qa import TOP_K, DocumentStore, answer_question
+from doc_qa import DocumentStore
+from models import AskRequest, AskResponse, IngestRequest
+from rag import answer_question
 from sample_data import SAMPLE_DOCUMENTS
 
-# One process, one store. Everything lives in memory and is lost on restart,
-# which is exactly what the brief asks for.
-store: DocumentStore | None = None
+
+# =============================================================================
+# STEP 9 -- STARTUP: BUILD THE STORE AND LOAD THE SAMPLE DOCUMENTS
+# =============================================================================
+# `lifespan` is FastAPI's startup/shutdown hook: everything before `yield` runs
+# once when the server starts. We embed the six sample documents there so /ask
+# works immediately.
+#
+# The store is in memory only -- restart the server and it is empty again,
+# which is exactly what the "no external database" constraint asks for.
+# =============================================================================
+
+store: Optional[DocumentStore] = None
 
 
 def get_store() -> DocumentStore:
-    """The store, or a 503 if startup could not build it (usually a missing key)."""
+    """The store, or a clear error if startup could not build it."""
     if store is None:
         raise HTTPException(
             status_code=503,
@@ -41,176 +90,93 @@ def get_store() -> DocumentStore:
 async def lifespan(_app: FastAPI):
     global store
     store = DocumentStore()
-
-    if os.getenv("SEED_SAMPLE_DOCS", "true").lower() not in {"false", "0", "no"}:
-        for source, category, text in SAMPLE_DOCUMENTS:
-            chunks = store.add_document(text, source, category)
-            print(f"Seeded {source} [{category}]: {chunks} chunks")
-
+    for source, category, text in SAMPLE_DOCUMENTS:
+        count = store.add_document(text, source, category)
+        print(f"Loaded {source} [{category}]: {count} chunks")
     yield
     store = None
 
 
 app = FastAPI(
-    title="Multi-Document Q&A API",
-    description=(
-        "Answers HR, IT and Finance questions from your documents using RAG, "
-        "with an optional category filter applied before retrieval."
-    ),
+    title="Multi-Document Q&A API with Source Filtering",
+    description="Answers HR, IT and Finance questions using RAG, with an "
+                "optional category filter applied before retrieval.",
     version="1.0.0",
     lifespan=lifespan,
 )
 
 
-# --------------------------------------------------------------------------- #
-# Request and response shapes -- FastAPI validates and serialises against these,
-# so every reply is valid JSON, including the 422s it raises on bad input.
-# --------------------------------------------------------------------------- #
-class DocumentIn(BaseModel):
-    source: str = Field(description="File name shown in sources_used, e.g. it_faq.txt")
-    category: str = Field(description="Knowledge area, e.g. HR, IT or Finance")
-    text: str = Field(description="The full plain text of the document")
+# =============================================================================
+# STEP 10 -- THE FOUR ENDPOINTS
+# =============================================================================
+#   GET  /health    is the server alive?
+#   POST /ingest    add documents under a category
+#   GET  /sources   list every category and its chunk count
+#   POST /ask       ask a question, optionally filtered   <-- the main one
+# =============================================================================
 
-    @field_validator("source", "category", "text")
-    @classmethod
-    def not_blank(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("must not be empty")
-        return value.strip()
-
-
-class IngestRequest(BaseModel):
-    documents: List[DocumentIn] = Field(min_length=1)
-
-
-class IngestedDocument(BaseModel):
-    source: str
-    category: str
-    chunks: int
-
-
-class IngestResponse(BaseModel):
-    status: str
-    ingested: List[IngestedDocument]
-    total_chunks: int
-
-
-class AskRequest(BaseModel):
-    question: str = Field(min_length=1)
-    category: Optional[str] = Field(
-        default=None,
-        description="Restrict retrieval to one category. Omit to search everything.",
-    )
-    top_k: int = Field(default=TOP_K, ge=1, le=10)
-
-    @field_validator("question")
-    @classmethod
-    def not_blank(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("must not be empty")
-        return value.strip()
-
-    @field_validator("category")
-    @classmethod
-    def blank_is_none(cls, value: Optional[str]) -> Optional[str]:
-        # "" and "   " mean "no filter", not "a category named nothing".
-        if value is None or not value.strip():
-            return None
-        return value.strip()
-
-
-class AskResponse(BaseModel):
-    answer: str
-    category_searched: str = Field(
-        description="The category actually searched, or 'all' when unfiltered."
-    )
-    sources_used: List[str]
-
-
-class CategorySummary(BaseModel):
-    category: str
-    chunks: int
-    sources: List[str]
-
-
-class SourcesResponse(BaseModel):
-    categories: List[CategorySummary]
-    total_documents: int
-    total_chunks: int
-
-
-class HealthResponse(BaseModel):
-    status: str
-    categories: int
-    documents: int
-    chunks: int
-
-
-# --------------------------------------------------------------------------- #
-# Endpoints
-# --------------------------------------------------------------------------- #
-@app.get("/health", response_model=HealthResponse)
-def health() -> HealthResponse:
-    """Liveness check, plus what is currently loaded."""
+@app.get("/health")
+def health() -> dict:
+    """Health check, plus a summary of what is loaded."""
     if store is None:
-        return HealthResponse(status="starting", categories=0, documents=0, chunks=0)
-    return HealthResponse(
-        status="ok",
-        categories=len(store.categories),
-        documents=len(store.sources),
-        chunks=len(store.chunks),
-    )
+        return {"status": "starting"}
+    return {
+        "status": "ok",
+        "categories": len(store.categories),
+        "documents": len(store.sources),
+        "chunks": len(store.chunks),
+    }
 
 
-@app.post("/ingest", response_model=IngestResponse)
-def ingest(request: IngestRequest) -> IngestResponse:
+@app.post("/ingest")
+def ingest(request: IngestRequest) -> dict:
     """Chunk, embed and store one or more documents under their categories."""
     active = get_store()
 
     ingested = []
     for document in request.documents:
-        chunks = active.add_document(document.text, document.source, document.category)
-        if chunks == 0:
+        count = active.add_document(document.text, document.source, document.category)
+        if count == 0:
             raise HTTPException(
                 status_code=400,
                 detail=f"'{document.source}' produced no usable text.",
             )
         ingested.append(
-            IngestedDocument(
-                source=document.source,
-                # Echo the stored spelling: ingesting "it" into an existing "IT"
-                # category joins it rather than creating a second one.
-                category=active.resolve_category(document.category) or document.category,
-                chunks=chunks,
-            )
+            {
+                "source": document.source,
+                "category": document.category,
+                "chunks": count,
+            }
         )
 
-    return IngestResponse(
-        status="stored",
-        ingested=ingested,
-        total_chunks=len(active.chunks),
-    )
+    return {
+        "status": "stored",
+        "ingested": ingested,
+        "total_chunks": len(active.chunks),
+    }
 
 
-@app.get("/sources", response_model=SourcesResponse)
-def sources() -> SourcesResponse:
+@app.get("/sources")
+def sources() -> dict:
     """Every category currently stored, with its chunk count and documents."""
     active = get_store()
-    counts: Dict[str, Dict[str, object]] = active.chunk_counts()
 
-    return SourcesResponse(
-        categories=[
-            CategorySummary(
-                category=category,
-                chunks=int(counts[category]["chunks"]),
-                sources=list(counts[category]["sources"]),  # type: ignore[arg-type]
-            )
-            # store.categories preserves ingestion order; counts is keyed by it.
-            for category in active.categories
-        ],
-        total_documents=len(active.sources),
-        total_chunks=len(active.chunks),
-    )
+    categories = []
+    for category in active.categories:
+        chunks = [c for c in active.chunks if c.category == category]
+        categories.append(
+            {
+                "category": category,
+                "chunks": len(chunks),
+                "sources": list(dict.fromkeys(c.source for c in chunks)),
+            }
+        )
+
+    return {
+        "categories": categories,
+        "total_documents": len(active.sources),
+        "total_chunks": len(active.chunks),
+    }
 
 
 @app.post("/ask", response_model=AskResponse)
@@ -219,28 +185,37 @@ def ask(request: AskRequest) -> AskResponse:
     active = get_store()
 
     category: Optional[str] = None
-    if request.category is not None:
+    if request.category and request.category.strip():
         category = active.resolve_category(request.category)
+
+        # An unknown category is a typo, or an area nobody has uploaded yet.
+        # Searching everything would quietly ignore the filter, so we say so --
+        # in the same JSON shape as any other answer, and never a crash.
         if category is None:
-            # An unknown category is a typo or a category nobody has ingested
-            # yet. Answering from everything would quietly ignore the filter, so
-            # the request is refused -- in the same JSON shape as any other
-            # answer, and naming the categories that do exist.
             known = ", ".join(active.categories) or "none yet"
             return AskResponse(
-                answer=(
-                    f"No documents are stored under category "
-                    f"'{request.category}'. Available categories: {known}."
-                ),
+                answer=f"No documents are stored under category "
+                       f"'{request.category}'. Available categories: {known}.",
                 category_searched=request.category,
                 sources_used=[],
             )
 
-    result = answer_question(
-        request.question, active, category=category, top_k=request.top_k
-    )
+    answer, sources_used = answer_question(request.question, active, category=category)
     return AskResponse(
-        answer=result.answer,
-        category_searched=result.category_searched,
-        sources_used=result.sources_used,
+        answer=answer,
+        category_searched=category or "all",
+        sources_used=sources_used,
     )
+
+
+# =============================================================================
+# STEP 11 -- RUN THE SERVER
+# =============================================================================
+# This only runs when you type `python app.py`. "app:app" means: the file
+# app.py, and the FastAPI variable named app inside it.
+# =============================================================================
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
