@@ -35,7 +35,6 @@ pip install -r requirements.txt
 cp .env.example .env          # then paste your key from https://aistudio.google.com/apikey
 
 uvicorn app:app --reload      # http://127.0.0.1:8000/docs
-python test_api.py            # the whole checklist in one go, no server needed
 ```
 
 Six sample documents across HR, IT and Finance load at startup, so `/ask` works immediately.
@@ -73,7 +72,7 @@ Omit `"category"` and the search spans everything; `category_searched` comes bac
 
 ## The filter, seen working
 
-Same question, two different scopes — from `python test_api.py`:
+Same question, two different scopes, both against the documents seeded at startup:
 
 ```
 Q: How many casual leaves do I have?   (category: HR)
@@ -103,7 +102,7 @@ the corpus, and the filter still wins.
 
 | Decision                                                      | Why                                                                                                                                                                                                                                                                                               |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Categories are data, not an enum**                          | There is no hard-coded `HR / IT / Finance` list. A category exists because a document was ingested under it, so `/ingest` can open a whole new area at runtime — `test_api.py` adds `Legal` and immediately queries it. An enum would have needed a code change and a redeploy.                   |
+| **Categories are data, not an enum**                          | There is no hard-coded `HR / IT / Finance` list. A category exists because a document was ingested under it, so `/ingest` can open a whole new area at runtime — the walkthrough below adds `Facilities` and immediately queries it. An enum would have needed a code change and a redeploy.                   |
 | **Lookup is case-insensitive, display is not**                | `resolve_category` matches on a casefolded key but returns the spelling first used at ingest. Asking for `"legal"` searches `Legal` and the response says `Legal`, so `category_searched` never teaches the caller a spelling the store does not use.                                             |
 | **An unknown category refuses, and says what exists**         | Falling back to searching everything would quietly ignore the filter the user asked for — worse than an error, because the answer looks right. `/ask` returns the normal JSON shape with the categories that do exist named in `answer` and `sources_used` empty. Same shape, HTTP 200, no crash. |
 

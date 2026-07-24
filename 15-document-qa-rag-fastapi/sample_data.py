@@ -1,4 +1,13 @@
-"""Three HR policy documents, loaded at startup so ``/ask`` works immediately."""
+"""
+STEP 2 -- THE SAMPLE DOCUMENTS
+
+Normally these would be uploaded files. Keeping them as plain strings means the
+project needs no data folder and no upload step to demonstrate.
+
+Three HR documents, between them covering every question in the problem
+statement's sample test: annual leave and carrying it over, sick leave, the
+work-from-home policy and the notice period for resignation.
+"""
 
 HR_POLICY = """
 Annual Leave
@@ -95,6 +104,7 @@ review by the reporting manager. Probation may be extended once, by up to 3
 months, with written reasons shared with the employee.
 """
 
+# (source, text)
 SAMPLE_DOCUMENTS = [
     ("hr_policy.txt", HR_POLICY),
     ("remote_work_policy.txt", REMOTE_WORK_POLICY),

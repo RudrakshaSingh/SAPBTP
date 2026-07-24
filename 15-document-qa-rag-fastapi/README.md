@@ -4,8 +4,10 @@ A **FastAPI** service that answers HR questions from your own documents. It retr
 most relevant passages first and asks **Google Gemini** to answer from those alone — so an
 employee gets the policy that is written down, not the one the model imagines.
 
-No vector database. Chunks and their embeddings live in a Python list, and retrieval is one
-cosine similarity per chunk.
+Hands-on 1, the base the rest of the series builds on —
+[16 — Multi-Document Q&A with Source Filtering](../16-multi-document-qa-source-filtering) adds
+categories on top of it. No vector database: chunks and their embeddings live in a Python list,
+and retrieval is one cosine similarity per chunk.
 
 Full brief: [problem statement 15](<../course-material/problem-statements/15-document-qa-rag-fastapi(for HON).md>).
 
@@ -18,8 +20,12 @@ POST /ask       question -> query embedding
                          -> cosine similarity against every chunk
                          -> top 3 extracts
                          -> Gemini, grounded prompt
+                         -> the model names the extracts it used   <- the citation
                          -> {"answer": ..., "sources_used": [...]}
 ```
+
+Retrieval hands over three extracts whether or not they are relevant, so `sources_used` is
+built from the extracts the model says it **drew on**, not from everything that came back.
 
 ## Run it
 
@@ -28,7 +34,6 @@ pip install -r requirements.txt
 cp .env.example .env          # then paste your key from https://aistudio.google.com/apikey
 
 uvicorn app:app --reload      # http://127.0.0.1:8000/docs
-python test_api.py            # the whole checklist in one go, no server needed
 ```
 
 The three sample HR documents load at startup, so `/ask` works immediately. Set
@@ -38,6 +43,7 @@ The three sample HR documents load at startup, so `/ask` works immediately. Set
 
 | Method | Path      | Purpose                                                          |
 | ------ | --------- | ---------------------------------------------------------------- |
+| `GET`  | `/`       | A friendlier landing page than a 404, pointing at `/docs`        |
 | `GET`  | `/health` | `{"status": "ok"}` plus how many documents and chunks are loaded |
 | `POST` | `/ingest` | Chunks, embeds and stores one or more documents                  |
 | `POST` | `/ask`    | Answers a question from the stored documents                     |
@@ -61,27 +67,48 @@ curl -X POST http://127.0.0.1:8000/ask \
 
 `/ask` also accepts `"top_k"` (1–10, default 3) if you want to widen retrieval.
 
+## The grounding, seen working
+
+Same corpus, two questions, both against the documents seeded at startup:
+
+```
+Q: How many annual leave days do I get?
+A: Every confirmed full-time employee is entitled to 18 days of paid annual leave...
+   sources_used: ['hr_policy.txt']
+
+Q: Who is the current Prime Minister?
+A: The information is not available in the provided documents.
+   sources_used: []
+```
+
+The second one is the point of the exercise. Retrieval did not fail — it returned its usual
+three chunks, whichever were nearest. The model knows the answer perfectly well, and refuses
+anyway, because none of the retrieved text supports it.
+
 ## Files
 
-| File                             | What it holds                                                         |
-| -------------------------------- | --------------------------------------------------------------------- |
-| [app.py](app.py)                 | The FastAPI app — request/response models and the three endpoints     |
-| [doc_qa.py](doc_qa.py)           | Chunking, embeddings, `DocumentStore`, cosine search, grounded prompt |
-| [sample_data.py](sample_data.py) | Three HR policy documents loaded at startup                           |
-| [test_api.py](test_api.py)       | Runs the sample queries in-process via `TestClient`                   |
+| File                             | Steps    | What it holds                                                    |
+| -------------------------------- | -------- | ---------------------------------------------------------------- |
+| [config.py](config.py)           | 1        | Model names, chunk size, top-k, the `FALLBACK` sentence          |
+| [sample_data.py](sample_data.py) | 2        | Three HR policy documents, loaded at startup                     |
+| [doc_qa.py](doc_qa.py)           | 3–4      | Chunking, embeddings, `DocumentStore`, cosine search             |
+| [rag.py](rag.py)                 | 5–7      | The grounded prompt and the cited answer                         |
+| [models.py](models.py)           | 8        | Request and response schemas                                     |
+| [app.py](app.py)                 | 9–11     | Startup, the four endpoints, and `python app.py`                 |
 
-## Three decisions worth arguing with
+## Four decisions worth arguing with
 
-| Decision                                                      | Why                                                                                                                                                                                                                                                                                                                                              |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Documents and questions are embedded differently**          | The same sentence is stored as an _answer_ but queried as a _question_. `doc_qa.py` keeps two embedders, `retrieval_document` and `retrieval_query`, and telling Gemini which role the text plays measurably sharpens retrieval.                                                                                                                 |
+| Decision                                                      | Why                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Documents and questions are embedded differently**          | The same sentence is stored as an _answer_ but queried as a _question_. `DocumentStore` keeps two embedders, `retrieval_document` and `retrieval_query`, and telling Gemini which role the text plays measurably sharpens retrieval.                                                                                                            |
 | **`sources_used` is what was _used_, not what was retrieved** | Retrieval always hands over three extracts, relevant or not. Returning all three sources would credit documents the answer never touched, so the model reports the extract numbers it drew on (`GroundedAnswer`, Pydantic structured output) and only those map to sources. Numbers outside the retrieved range are dropped rather than trusted. |
-| **The fallback sentence cites nothing**                       | When the answer is not in the documents, `sources_used` comes back empty. Listing the three chunks that were retrieved anyway would imply the documents were consulted _and found to contain_ an answer.                                                                                                                                         |
-| **`temperature=0`**                                           | The answer should be a faithful reading of the retrieved text, not a fresh composition each time.                                                                                                                                                                                                                                                |
+| **The fallback sentence cites nothing**                       | When the answer is not in the documents, `sources_used` comes back empty. Listing the three chunks that were retrieved anyway would imply the documents were consulted _and found to contain_ an answer.                                                                                                                                        |
+| **`temperature=0`**                                           | The answer should be a faithful reading of the retrieved text, not a fresh composition each time.                                                                                                                                                                                                                                              |
 
 Retrieval always returns the top 3 chunks — even for "Who is the current Prime Minister?"
 Similarity search has no notion of "nothing matched", so the _prompt_ is what refuses. That
-guard rail is `FALLBACK` and rules 3–4 of `RAG_PROMPT` in [doc_qa.py](doc_qa.py).
+guard rail is `FALLBACK` in [config.py](config.py) and rules 3–4 of `RAG_PROMPT` in
+[rag.py](rag.py).
 
 ## Evaluation criteria
 
@@ -95,8 +122,8 @@ guard rail is `FALLBACK` and rules 3–4 of `RAG_PROMPT` in [doc_qa.py](doc_qa.p
 | Answer grounded in retrieved text only                 | `RAG_PROMPT`, `answer_question()`                      |
 | Sources reported with the answer                       | `GroundedAnswer.used_extracts` → `Answer.sources_used` |
 | Out-of-scope questions say so                          | `FALLBACK`                                             |
-| Every response is valid JSON                           | Pydantic response models on all three routes           |
-| No external vector database                            | `self.chunks: List[Chunk]`                             |
+| Every response is valid JSON                           | Pydantic models on `/ingest` and `/ask`; plain dicts elsewhere |
+| No external vector database                            | `DocumentStore.chunks: List[Chunk]`                    |
 
 ## Where to take it next
 
@@ -109,7 +136,7 @@ guard rail is `FALLBACK` and rules 3–4 of `RAG_PROMPT` in [doc_qa.py](doc_qa.p
 - **Upload real files** — accept PDF and DOCX via `UploadFile` and extract text with
   `pypdf` before chunking.
 
-## Example Seeing it work — the same question, before and after ingest
+## Example — Seeing it work: the same question, before and after ingest
 
 Start the server and open **http://127.0.0.1:8000/docs**. That is Swagger UI: every endpoint
 has a **Try it out** button, an editable request body and an **Execute** button, so the whole
