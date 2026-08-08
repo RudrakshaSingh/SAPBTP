@@ -133,7 +133,13 @@ def check_support(answer: str, top3: list[tuple], context: str) -> tuple[bool, s
         f"Extracts:\n{context}\n\n"
         f"Proposed answer: {answer}"
     )
-    verdict = llm.invoke(check_prompt).content.strip().upper()
+    raw_content = llm.invoke(check_prompt).content
+    if isinstance(raw_content, list):
+        raw_content = "".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in raw_content
+        )
+    verdict = raw_content.strip().upper()
 
     supported = verdict.startswith("SUPPORTED")
     if not supported:

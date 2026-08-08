@@ -125,7 +125,13 @@ def rewrite_follow_up(question: str, history: list[dict]) -> str:
         "Standalone question:"
     )
     result = llm.invoke(prompt)
-    return result.content.strip() or question
+    content = result.content
+    if isinstance(content, list):
+        content = " ".join(
+            part.get("text", "") if isinstance(part, dict) else str(part)
+            for part in content
+        )
+    return content.strip() or question
 
 # --------------- app ---------------
 
